@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EPF Retirement Calculator</title>
+    <title data-i18n="appTitle">EPF Investment and Retirement Calculator</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- Plugin for data labels on the chart -->
@@ -75,36 +75,59 @@
             background: #cbd5e1;
             border-radius: 10px;
         }
+        
+        .advance-panel {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+        }
+        .advance-panel.open {
+            max-height: 1000px;
+        }
     </style>
 </head>
 <body class="p-4 md:p-8 text-gray-800">
 
-    <!-- Language Switcher -->
-    <div class="max-w-6xl mx-auto flex justify-end mb-4 gap-2">
-        <button onclick="setLanguage('en')" id="btn-en" class="px-4 py-1 rounded-full text-xs md:text-sm font-bold bg-blue-600 text-white shadow-sm border border-blue-600 transition">English</button>
-        <button onclick="setLanguage('zh')" id="btn-zh" class="px-4 py-1 rounded-full text-xs md:text-sm font-bold bg-white text-gray-600 border border-gray-300 hover:border-blue-600 transition">中文</button>
+    <!-- Header & Language Switcher -->
+    <div class="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+        <h1 class="text-2xl md:text-3xl font-extrabold text-gray-900 tracking-tight" data-i18n="appTitle">
+            EPF Investment and Retirement Calculator
+        </h1>
+        <div class="flex gap-2 self-end md:self-auto">
+            <button onclick="setLanguage('en')" id="btn-en" class="px-4 py-1 rounded-full text-xs md:text-sm font-bold bg-blue-600 text-white shadow-sm border border-blue-600 transition">English</button>
+            <button onclick="setLanguage('zh')" id="btn-zh" class="px-4 py-1 rounded-full text-xs md:text-sm font-bold bg-white text-gray-600 border border-gray-300 hover:border-blue-600 transition">中文</button>
+        </div>
     </div>
 
     <div class="max-w-6xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden flex flex-col lg:flex-row mb-8">
         
-        <!-- Input Form (Left Side) - Removed fixed height/overflow on mobile -->
+        <!-- Input Form (Left Side) -->
         <div class="w-full lg:w-5/12 p-6 md:p-8 bg-gray-50 border-b lg:border-b-0 lg:border-r border-gray-200 lg:overflow-y-auto lg:max-h-[90vh]">
-            <h2 class="text-2xl font-bold text-blue-700 mb-6" data-i18n="titleDetails">Your Details</h2>
+            <h2 class="text-xl font-bold text-blue-700 mb-6 flex items-center gap-2">
+                <span class="w-2 h-6 bg-blue-600 rounded-full"></span>
+                <span data-i18n="titleDetails">Your Details</span>
+            </h2>
             
             <div class="space-y-4">
-                <div class="input-group">
-                    <label data-i18n="labelCurrentEpf">Current EPF Savings (RM)</label>
-                    <input type="number" id="currentEpf" value="150000" inputmode="numeric">
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="input-group">
+                        <label data-i18n="labelCurrentEpf">Current EPF (RM)</label>
+                        <input type="number" id="currentEpf" value="150000" inputmode="numeric">
+                    </div>
+                    <div class="input-group">
+                        <label data-i18n="labelStartYear">Starting Year</label>
+                        <input type="number" id="startYear" value="2024" oninput="calculateEPF(); renderOneOffs();" inputmode="numeric">
+                    </div>
                 </div>
 
                 <div class="grid grid-cols-2 gap-4">
                     <div class="input-group">
                         <label data-i18n="labelCurrentAge">Current Age</label>
-                        <input type="number" id="currentAge" value="30" inputmode="numeric">
+                        <input type="number" id="currentAge" value="30" oninput="calculateEPF(); renderOneOffs();" inputmode="numeric">
                     </div>
                     <div class="input-group">
                         <label data-i18n="labelRetireAge">Retirement Age</label>
-                        <input type="number" id="retireAge" value="60" inputmode="numeric">
+                        <input type="number" id="retireAge" value="60" oninput="calculateEPF(); renderOneOffs();" inputmode="numeric">
                     </div>
                 </div>
 
@@ -153,6 +176,35 @@
                     </div>
                 </div>
 
+                <!-- Advanced Feature: One-off Contributions MOVED HERE -->
+                <div class="pt-2">
+                    <button onclick="toggleAdvance()" class="flex items-center justify-between w-full p-3 bg-blue-50 border border-blue-100 rounded-lg hover:bg-blue-100 transition-colors group">
+                        <span class="font-bold text-blue-700 text-sm uppercase tracking-wide" data-i18n="titleAdvance">Advanced Features</span>
+                        <svg id="advanceArrow" class="w-5 h-5 text-blue-600 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </button>
+                    
+                    <div id="advancePanel" class="advance-panel">
+                        <div class="p-4 bg-gray-100 rounded-b-lg border-x border-b border-gray-200 space-y-4">
+                            <h4 class="text-xs font-bold text-gray-500 uppercase mb-2" data-i18n="oneOffTitle">One-off Self Contributions</h4>
+                            
+                            <!-- Header for columns -->
+                            <div class="grid grid-cols-[80px,80px,1fr,40px] gap-2 px-1 mb-1">
+                                <span class="text-[10px] font-bold text-gray-400 uppercase" data-i18n="phAge">Age</span>
+                                <span class="text-[10px] font-bold text-gray-400 uppercase text-center" data-i18n="colYear">Year</span>
+                                <span class="text-[10px] font-bold text-gray-400 uppercase" data-i18n="phAmount">Amount (RM)</span>
+                                <span></span>
+                            </div>
+
+                            <div id="oneOffList" class="space-y-2">
+                                <!-- Dynamic one-off items here -->
+                            </div>
+                            <button onclick="addOneOff()" class="w-full py-2 px-4 border-2 border-dashed border-blue-300 text-blue-600 rounded-lg text-sm font-bold hover:bg-blue-50 transition-colors mt-2">
+                                + <span data-i18n="btnAddOneOff">Add One-off Injection</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="pt-4 pb-2">
                     <hr class="border-gray-300">
                 </div>
@@ -184,7 +236,10 @@
 
         <!-- Results Display (Right Side) -->
         <div class="w-full lg:w-7/12 p-6 md:p-8 flex flex-col bg-white">
-            <h2 class="text-2xl font-bold text-gray-800 mb-6" data-i18n="titleProjection">Your Projection</h2>
+            <h2 class="text-xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+                <span class="w-2 h-6 bg-gray-400 rounded-full"></span>
+                <span data-i18n="titleProjection">Your Projection</span>
+            </h2>
             
             <div id="errorMessage" class="hidden mb-6 p-4 bg-red-100 text-red-700 rounded-lg border border-red-200 font-semibold"></div>
 
@@ -242,12 +297,14 @@
             <span data-i18n="tableTitle">Yearly Detailed Breakdown</span>
         </h3>
         <div class="table-container overflow-x-auto border border-gray-200 rounded-lg max-h-[500px]">
-            <table class="w-full text-left border-collapse min-w-[600px]">
+            <table class="w-full text-left border-collapse min-w-[700px]">
                 <thead class="bg-gray-50 sticky top-0 shadow-sm z-10">
                     <tr>
+                        <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider" data-i18n="colYear">Year</th>
                         <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider" data-i18n="colAge">Age</th>
                         <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider" data-i18n="colPhase">Phase</th>
                         <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider text-right" data-i18n="colIncome">Annual Income (RM)</th>
+                        <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider text-right" data-i18n="colExtra">One-off (RM)</th>
                         <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider text-right" data-i18n="colSavings">EPF Balance (RM)</th>
                         <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider text-right" data-i18n="colWithdrawal">Monthly Spending (RM)</th>
                     </tr>
@@ -260,16 +317,18 @@
     </div>
 
     <script>
-        // Register the datalabels plugin
         Chart.register(ChartDataLabels);
 
         let chartInstance = null;
         let currentLang = 'en';
+        let oneOffContributions = []; 
 
         const i18n = {
             en: {
+                appTitle: "EPF Investment and Retirement Calculator",
                 titleDetails: "Your Details",
-                labelCurrentEpf: "Current EPF Savings (RM)",
+                labelCurrentEpf: "Current EPF (RM)",
+                labelStartYear: "Starting Year",
                 labelCurrentAge: "Current Age",
                 labelRetireAge: "Retirement Age",
                 titleSalary: "Salary & Contributions",
@@ -300,13 +359,15 @@
                 chartSalary: "Annual Income (RM)",
                 showSalary: "Show Income Line",
                 chartTitle: "Financial Forecast",
-                chartX: "Age",
+                chartX: "Age (Year)",
                 chartYFund: "EPF Fund Balance",
                 chartYSalary: "Annual Income",
                 tableTitle: "Yearly Detailed Breakdown",
+                colYear: "Year",
                 colAge: "Age",
                 colPhase: "Phase",
                 colIncome: "Annual Income (RM)",
+                colExtra: "One-off (RM)",
                 colSavings: "EPF Balance (RM)",
                 colWithdrawal: "Monthly Exp (RM)",
                 phaseAccum: "Accumulating",
@@ -320,11 +381,18 @@
                 realityPart4: "/month when you retire.",
                 warnSolid: "🌟 Your retirement plan looks solid and sustainable.",
                 warnModerate: "⚠️ Your fund covers a moderate period. Consider saving more for longevity.",
-                warnRisk: "🚨 Risk: Your fund may run out early. Increase savings or lower expenses."
+                warnRisk: "🚨 Risk: Your fund may run out early. Increase savings or lower expenses.",
+                titleAdvance: "Advanced Features",
+                oneOffTitle: "One-off Self Contributions",
+                btnAddOneOff: "Add One-off Injection",
+                phAge: "Age",
+                phAmount: "Amount"
             },
             zh: {
+                appTitle: "公积金投资与退休计算器",
                 titleDetails: "个人详情",
                 labelCurrentEpf: "当前公积金存款 (RM)",
+                labelStartYear: "开始年份",
                 labelCurrentAge: "当前年龄",
                 labelRetireAge: "退休年龄",
                 titleSalary: "薪水与缴纳额",
@@ -355,13 +423,15 @@
                 chartSalary: "年度总收入 (RM)",
                 showSalary: "显示收入曲线",
                 chartTitle: "财务趋势图",
-                chartX: "年龄",
+                chartX: "年龄 (年份)",
                 chartYFund: "公积金余额",
                 chartYSalary: "年度总收入",
                 tableTitle: "年度详细数据表",
+                colYear: "年份",
                 colAge: "年龄",
                 colPhase: "阶段",
                 colIncome: "年度收入 (RM)",
+                colExtra: "额外注入 (RM)",
                 colSavings: "公积金余额 (RM)",
                 colWithdrawal: "月度开销 (RM)",
                 phaseAccum: "储蓄期",
@@ -375,9 +445,17 @@
                 realityPart4: " 才能维持。",
                 warnSolid: "🌟 您的退休计划非常稳健，资金充足。",
                 warnModerate: "⚠️ 您的资金可支撑一段中等时间，建议增加储蓄以防长寿风险。",
-                warnRisk: "🚨 风险：您的资金可能会过早耗尽。建议增加存款或降低开支。"
+                warnRisk: "🚨 风险：您的资金可能会过早耗尽。建议增加存款或降低开支。",
+                titleAdvance: "高级功能",
+                oneOffTitle: "一次性个人额外注资",
+                btnAddOneOff: "添加额外注入资金",
+                phAge: "年龄",
+                phAmount: "金额"
             }
         };
+
+        // Initialize Start Year to current year
+        document.getElementById('startYear').value = new Date().getFullYear();
 
         function setLanguage(lang) {
             currentLang = lang;
@@ -388,7 +466,64 @@
                 if (i18n[lang][key]) el.innerText = i18n[lang][key];
             });
             updateDefaultRates();
+            renderOneOffs();
             calculateEPF();
+        }
+
+        function toggleAdvance() {
+            const panel = document.getElementById('advancePanel');
+            const arrow = document.getElementById('advanceArrow');
+            panel.classList.toggle('open');
+            arrow.style.transform = panel.classList.contains('open') ? 'rotate(180deg)' : 'rotate(0)';
+        }
+
+        function addOneOff() {
+            const currentAge = parseInt(document.getElementById('currentAge').value) || 30;
+            oneOffContributions.push({ age: currentAge + 5, amount: 10000 });
+            renderOneOffs();
+            calculateEPF();
+        }
+
+        function removeOneOff(index) {
+            oneOffContributions.splice(index, 1);
+            renderOneOffs();
+            calculateEPF();
+        }
+
+        function updateOneOff(index, field, value) {
+            oneOffContributions[index][field] = parseFloat(value) || 0;
+            calculateEPF();
+            if (field === 'age') {
+                const yearSpan = document.getElementById(`oneOffYear-${index}`);
+                if (yearSpan) {
+                    const startYear = parseInt(document.getElementById('startYear').value) || 2024;
+                    const currentAge = parseInt(document.getElementById('currentAge').value) || 30;
+                    const ageVal = parseInt(value) || 0;
+                    yearSpan.innerText = startYear + (ageVal - currentAge);
+                }
+            }
+        }
+
+        function renderOneOffs() {
+            const list = document.getElementById('oneOffList');
+            const t = i18n[currentLang];
+            const startYear = parseInt(document.getElementById('startYear').value) || 2024;
+            const currentAge = parseInt(document.getElementById('currentAge').value) || 30;
+
+            list.innerHTML = oneOffContributions.map((item, index) => {
+                const yearVal = startYear + (parseInt(item.age) - currentAge);
+                return `
+                <div class="grid grid-cols-[80px,80px,1fr,40px] items-center gap-2">
+                    <input type="number" value="${item.age}" oninput="updateOneOff(${index}, 'age', this.value)" placeholder="${t.phAge}" class="p-2 text-sm border border-gray-300 rounded focus:border-blue-400 outline-none h-[42px]">
+                    <div class="text-center font-bold text-gray-500 text-sm bg-gray-200 flex items-center justify-center rounded h-[42px] border border-gray-200">
+                        <span id="oneOffYear-${index}">${yearVal}</span>
+                    </div>
+                    <input type="number" value="${item.amount}" oninput="updateOneOff(${index}, 'amount', this.value)" placeholder="${t.phAmount}" class="p-2 text-sm border border-gray-300 rounded focus:border-blue-400 outline-none h-[42px]">
+                    <button onclick="removeOneOff(${index})" class="flex items-center justify-center text-gray-400 hover:text-red-500 transition-colors h-[42px]">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                    </button>
+                </div>
+            `}).join('');
         }
 
         function updateDefaultRates() {
@@ -411,6 +546,7 @@
             errorEl.classList.add('hidden');
             
             let balance = parseFloat(document.getElementById('currentEpf').value) || 0;
+            let startYear = parseInt(document.getElementById('startYear').value) || new Date().getFullYear();
             let currentAge = parseInt(document.getElementById('currentAge').value) || 0;
             let retireAge = parseInt(document.getElementById('retireAge').value) || 0;
             let salary = parseFloat(document.getElementById('salary').value) || 0;
@@ -437,35 +573,38 @@
             let chartSalaryData = [];
             let tableRows = [];
 
-            // Initial State
-            chartLabels.push(currentAge);
+            chartLabels.push(`${currentAge} (${startYear})`);
             chartAccData.push(balance);
             chartDrawData.push(null);
             chartSalaryData.push(salary * 12 + bonus);
-            tableRows.push({ age: currentAge, phase: i18n[currentLang].phaseAccum, income: salary * 12 + bonus, balance: balance, withdrawal: 0 });
+            tableRows.push({ year: startYear, age: currentAge, phase: i18n[currentLang].phaseAccum, income: salary * 12 + bonus, balance: balance, withdrawal: 0, extra: 0 });
 
-            // Accumulation
             let yearlySalary = salary * 12;
             let yearlyBonus = bonus;
             for (let i = 1; i <= yearsToRetire; i++) {
+                let ageAtStep = currentAge + i;
+                let yr = startYear + i;
                 let currentTotalIncome = yearlySalary + yearlyBonus;
                 let yearlyContribution = currentTotalIncome * (employeeRate + employerRate);
-                balance += yearlyContribution;
+                
+                let yearlyExtra = oneOffContributions
+                    .filter(o => parseInt(o.age) === ageAtStep)
+                    .reduce((sum, o) => sum + (parseFloat(o.amount) || 0), 0);
+
+                balance += yearlyContribution + yearlyExtra;
                 balance *= (1 + epfReturn);
                 
                 yearlySalary *= (1 + increment);
                 yearlyBonus *= (1 + increment);
 
-                chartLabels.push(currentAge + i);
+                chartLabels.push(`${ageAtStep} (${yr})`);
                 chartAccData.push(balance);
                 chartDrawData.push(null);
                 chartSalaryData.push(yearlySalary + yearlyBonus);
-                tableRows.push({ age: currentAge + i, phase: i18n[currentLang].phaseAccum, income: yearlySalary + yearlyBonus, balance: balance, withdrawal: 0 });
+                tableRows.push({ year: yr, age: ageAtStep, phase: i18n[currentLang].phaseAccum, income: yearlySalary + yearlyBonus, balance: balance, withdrawal: 0, extra: yearlyExtra });
             }
 
             let retirementFund = balance;
-
-            // Decumulation
             let futureMonthlyExpenses = desiredIncome * Math.pow(1 + inflation, yearsToRetire);
             let annualWithdrawal = futureMonthlyExpenses * 12;
             let postRetirementBalance = retirementFund;
@@ -486,17 +625,18 @@
                 }
                 
                 let age = retireAge + Math.ceil(yearsLasted);
-                chartLabels.push(age);
+                let yr = startYear + yearsToRetire + Math.ceil(yearsLasted);
+                
+                chartLabels.push(`${age} (${yr})`);
                 chartAccData.push(null);
                 chartDrawData.push(postRetirementBalance);
                 chartSalaryData.push(null);
-                tableRows.push({ age: age, phase: i18n[currentLang].phaseRetired, income: 0, balance: postRetirementBalance, withdrawal: annualWithdrawal / 12 });
+                tableRows.push({ year: yr, age: age, phase: i18n[currentLang].phaseRetired, income: 0, balance: postRetirementBalance, withdrawal: annualWithdrawal / 12, extra: 0 });
                 
                 if (postRetirementBalance <= 0) break;
                 annualWithdrawal *= (1 + inflation);
             }
 
-            // Update UI Summary
             document.getElementById('resAge').innerText = retireAge;
             document.getElementById('resTotal').innerText = Math.round(retirementFund).toLocaleString();
             let displayYears = yearsLasted >= maxYears ? "50+" : yearsLasted.toFixed(1);
@@ -513,10 +653,7 @@
             else if (yearsLasted >= 15) { warningEl.innerText = t.warnModerate; warningEl.className = "text-sm font-bold text-amber-500"; }
             else { warningEl.innerText = t.warnRisk; warningEl.className = "text-sm font-bold text-red-600"; }
 
-            // Update Table
             renderTable(tableRows);
-
-            // Update Chart
             renderChart(chartLabels, chartAccData, chartDrawData, chartSalaryData, showSalaryLine);
         }
 
@@ -524,6 +661,7 @@
             const body = document.getElementById('breakdownBody');
             body.innerHTML = rows.map(row => `
                 <tr class="hover:bg-gray-50 transition-colors">
+                    <td class="px-4 py-3 font-semibold text-gray-500">${row.year}</td>
                     <td class="px-4 py-3 font-semibold text-gray-700">${row.age}</td>
                     <td class="px-4 py-3">
                         <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${row.phase.includes('Accum') || row.phase.includes('储') ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'}">
@@ -531,6 +669,7 @@
                         </span>
                     </td>
                     <td class="px-4 py-3 text-right text-gray-600">${row.income > 0 ? 'RM ' + Math.round(row.income).toLocaleString() : '-'}</td>
+                    <td class="px-4 py-3 text-right ${row.extra > 0 ? 'text-blue-600 font-bold' : 'text-gray-400'}">${row.extra > 0 ? 'RM ' + Math.round(row.extra).toLocaleString() : '-'}</td>
                     <td class="px-4 py-3 text-right font-mono font-medium text-gray-900">RM ${Math.round(row.balance).toLocaleString()}</td>
                     <td class="px-4 py-3 text-right text-red-600 font-medium">${row.withdrawal > 0 ? 'RM ' + Math.round(row.withdrawal).toLocaleString() : '-'}</td>
                 </tr>
@@ -577,7 +716,15 @@
                     responsive: true,
                     maintainAspectRatio: false,
                     scales: {
-                        x: { title: { display: true, text: t.chartX } },
+                        x: { 
+                            title: { display: true, text: t.chartX },
+                            ticks: {
+                                maxRotation: 45,
+                                minRotation: 45,
+                                autoSkip: true,
+                                maxTicksLimit: window.innerWidth < 768 ? 8 : 15
+                            }
+                        },
                         y: { 
                             title: { display: true, text: t.chartYFund },
                             position: 'left',
@@ -604,8 +751,10 @@
                             font: { size: 9, weight: 'bold' },
                             color: (context) => context.dataset.borderColor,
                             formatter: (value, context) => {
-                                const age = labels[context.dataIndex];
-                                // On mobile, show labels less frequently to avoid clutter
+                                const labelText = labels[context.dataIndex];
+                                const ageMatch = labelText.match(/^(\d+)/);
+                                const age = ageMatch ? parseInt(ageMatch[1]) : 0;
+                                
                                 const interval = window.innerWidth < 768 ? 10 : 5;
                                 if (value && (age % interval === 0)) {
                                     if (value >= 1000000) return (value / 1000000).toFixed(2) + 'M';
@@ -622,7 +771,6 @@
 
         window.onload = () => {
             setLanguage('en');
-            // Recalculate on window resize to adjust label frequency
             window.addEventListener('resize', () => {
                 if (chartInstance) calculateEPF();
             });
