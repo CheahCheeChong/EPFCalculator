@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EPF Retirement Calculator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Plugin for data labels on the chart -->
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Noto Sans SC';
+            background-color: #f4f7f6;
+        }
+        .input-group label {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 0.25rem;
+            display: block;
+        }
+        .input-group input {
+            width: 100%;
+            padding: 0.5rem 0.75rem;
+            border: 1px solid #d1d5db;
+            border-radius: 0.375rem;
+            transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+        }
+        .input-group input:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+        }
+        .help-text {
+            font-size: 0.75rem;
+            color: #6b7280;
+            margin-bottom: 0.5rem;
+            display: block;
+        }
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 40px;
+            height: 20px;
+        }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 20px;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 14px; width: 14px;
+            left: 3px; bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        input:checked + .slider { background-color: #8b5cf6; }
+        input:checked + .slider:before { transform: translateX(20px); }
+
+        /* Custom scrollbar for table */
+        .table-container::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        .table-container::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8 text-gray-800">
+
+    <!-- Language Switcher -->
+    <div class="max-w-6xl mx-auto flex justify-end mb-4 gap-2">
+        <button onclick="setLanguage('en')" id="btn-en" class="px-4 py-1 rounded-full text-sm font-bold bg-blue-600 text-white shadow-sm border border-blue-600 transition">English</button>
+        <button onclick="setLanguage('zh')" id="btn-zh" class="px-4 py-1 rounded-full text-sm font-bold bg-white text-gray-600 border border-gray-300 hover:border-blue-600 transition">中文</button>
+    </div>
+
+    <div class="max-w-6xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden flex flex-col lg:flex-row mb-8">
+        
+        <!-- Input Form (Left Side) -->
+        <div class="w-full lg:w-5/12 p-6 md:p-8 bg-gray-50 border-r border-gray-200 overflow-y-auto" style="max-height: 90vh;">
+            <h2 class="text-2xl font-bold text-blue-700 mb-6" data-i18n="titleDetails">Your Details</h2>
+            
+            <div class="space-y-4">
+                <div class="input-group">
+                    <label data-i18n="labelCurrentEpf">Current EPF Savings (RM)</label>
+                    <input type="number" id="currentEpf" value="150000">
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="input-group">
+                        <label data-i18n="labelCurrentAge">Current Age</label>
+                        <input type="number" id="currentAge" value="30">
+                    </div>
+                    <div class="input-group">
+                        <label data-i18n="labelRetireAge">Retirement Age</label>
+                        <input type="number" id="retireAge" value="60">
+                    </div>
+                </div>
+
+                <div class="pt-4 pb-2">
+                    <hr class="border-gray-300">
+                </div>
+
+                <h3 class="text-lg font-bold text-blue-700" data-i18n="titleSalary">Salary & Contributions</h3>
+
+                <div class="input-group">
+                    <div class="flex justify-between items-center mb-1">
+                        <label class="!mb-0" data-i18n="labelMonthlySalary">Monthly Basic Salary (RM)</label>
+                        <span class="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
+                            <span data-i18n="labelAnnualSalary">Annual:</span> RM <span id="annualSalaryDisplay">0</span>
+                        </span>
+                    </div>
+                    <input type="number" id="salary" value="6000" oninput="updateDefaultRates()">
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="input-group">
+                        <label data-i18n="labelEmployeeRate">Employee Rate (%)</label>
+                        <input type="number" id="employeeRate" value="11" step="1">
+                    </div>
+                    <div class="input-group">
+                        <label data-i18n="labelEmployerRate">Employer Rate (%)</label>
+                        <input type="number" id="employerRate" value="12" step="1">
+                        <span class="help-text" id="rateHint">RM 5k+ threshold: 12%</span>
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <label data-i18n="labelBonus">Annual Bonus (RM)</label>
+                    <span class="help-text" data-i18n="helpBonus">Est. annual bonus subject to EPF</span>
+                    <input type="number" id="bonus" value="12000">
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="input-group">
+                        <label data-i18n="labelIncrement">Salary Increment (%)</label>
+                        <input type="number" id="increment" value="4" step="0.1">
+                    </div>
+                    <div class="input-group">
+                        <label data-i18n="labelDividend">EPF Dividend (%)</label>
+                        <input type="number" id="epfReturn" value="5.5" step="0.1">
+                    </div>
+                </div>
+
+                <div class="pt-4 pb-2">
+                    <hr class="border-gray-300">
+                </div>
+                
+                <h3 class="text-lg font-bold text-blue-700" data-i18n="titleSpending">Retirement Spending</h3>
+
+                <div class="input-group">
+                    <label data-i18n="labelDesiredIncome">Desired Monthly Expenses (Today's RM)</label>
+                    <span class="help-text" data-i18n="helpDesired">Monthly budget in today's money</span>
+                    <input type="number" id="desiredIncome" value="4000">
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="input-group">
+                        <label data-i18n="labelInflation">Inflation Rate (%)</label>
+                        <input type="number" id="inflation" value="3" step="0.1">
+                    </div>
+                    <div class="input-group">
+                        <label data-i18n="labelPostReturn">Post-Retire Return (%)</label>
+                        <input type="number" id="postRetireReturn" value="4" step="0.1">
+                    </div>
+                </div>
+
+                <button onclick="calculateEPF()" class="w-full mt-6 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition duration-200 shadow-md" data-i18n="btnCalculate">
+                    Calculate Future
+                </button>
+            </div>
+        </div>
+
+        <!-- Results Display (Right Side) -->
+        <div class="w-full lg:w-7/12 p-6 md:p-8 flex flex-col bg-white">
+            <h2 class="text-2xl font-bold text-gray-800 mb-6" data-i18n="titleProjection">Your Projection</h2>
+            
+            <div id="errorMessage" class="hidden mb-6 p-4 bg-red-100 text-red-700 rounded-lg border border-red-200 font-semibold"></div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                <div class="bg-gradient-to-br from-blue-600 to-blue-400 p-6 rounded-xl text-white shadow-lg">
+                    <h3 class="text-blue-100 text-sm font-semibold uppercase tracking-wider mb-2">
+                        <span data-i18n="resFundAt">Fund at Age</span> <span id="resAge">60</span>
+                    </h3>
+                    <p class="text-3xl font-bold mb-1">RM <span id="resTotal">0.00</span></p>
+                    <p class="text-blue-100 text-xs" data-i18n="resFundDesc">Projected total EPF balance.</p>
+                </div>
+
+                <div class="bg-gradient-to-br from-emerald-600 to-emerald-400 p-6 rounded-xl text-white shadow-lg">
+                    <h3 class="text-emerald-100 text-sm font-semibold uppercase tracking-wider mb-2" data-i18n="resLastTitle">Money Will Last For</h3>
+                    <p class="text-3xl font-bold mb-1"><span id="resYears">0</span> <span data-i18n="unitYears">Years</span></p>
+                    <p class="text-emerald-100 text-xs"><span data-i18n="resUntilAge">Until age</span> <span id="resFinalAge">0</span></p>
+                </div>
+            </div>
+
+            <div class="bg-gray-50 border border-gray-200 p-5 rounded-lg mb-6">
+                <h3 class="text-gray-800 font-bold mb-2" data-i18n="realityTitle">Cost of Living Impact</h3>
+                <p class="text-sm text-gray-600 mb-2" id="realityText"></p>
+                <p id="sustainabilityWarning" class="text-sm font-bold"></p>
+            </div>
+
+            <!-- Chart Header with Toggle -->
+            <div class="flex flex-wrap justify-between items-center mb-4 px-2 gap-4">
+                <h3 class="font-bold text-gray-700" data-i18n="chartTitle">Financial Forecast</h3>
+                <div class="flex items-center gap-4">
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs font-semibold text-gray-500" data-i18n="showSalary">Show Income Line</span>
+                        <label class="switch">
+                            <input type="checkbox" id="toggleSalary" onchange="calculateEPF()">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chart Container -->
+            <div class="flex-grow w-full relative mb-4" style="min-height: 400px;">
+                <canvas id="epfChart"></canvas>
+            </div>
+            
+            <p class="text-xs text-gray-400 mt-4 text-center" data-i18n="footerNote">Based on statutory contribution rates (subject to RM 5,000 salary threshold logic).</p>
+        </div>
+    </div>
+
+    <!-- Yearly Breakdown Table -->
+    <div class="max-w-6xl mx-auto bg-white rounded-xl shadow-lg p-6 md:p-8 mb-12">
+        <h3 class="text-xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+            </svg>
+            <span data-i18n="tableTitle">Yearly Detailed Breakdown</span>
+        </h3>
+        <div class="table-container overflow-x-auto border border-gray-200 rounded-lg max-h-[500px]">
+            <table class="w-full text-left border-collapse">
+                <thead class="bg-gray-50 sticky top-0 shadow-sm z-10">
+                    <tr>
+                        <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider" data-i18n="colAge">Age</th>
+                        <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider" data-i18n="colPhase">Phase</th>
+                        <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider text-right" data-i18n="colIncome">Annual Income (RM)</th>
+                        <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider text-right" data-i18n="colSavings">EPF Balance (RM)</th>
+                        <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider text-right" data-i18n="colWithdrawal">Monthly Spending (RM)</th>
+                    </tr>
+                </thead>
+                <tbody id="breakdownBody" class="divide-y divide-gray-100 text-sm">
+                    <!-- Rows generated by JS -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // Register the datalabels plugin
+        Chart.register(ChartDataLabels);
+
+        let chartInstance = null;
+        let currentLang = 'en';
+
+        const i18n = {
+            en: {
+                titleDetails: "Your Details",
+                labelCurrentEpf: "Current EPF Savings (RM)",
+                labelCurrentAge: "Current Age",
+                labelRetireAge: "Retirement Age",
+                titleSalary: "Salary & Contributions",
+                labelMonthlySalary: "Monthly Basic Salary (RM)",
+                labelAnnualSalary: "Annual:",
+                labelEmployeeRate: "Employee Rate (%)",
+                labelEmployerRate: "Employer Rate (%)",
+                labelBonus: "Annual Bonus (RM)",
+                helpBonus: "Est. annual bonus subject to EPF",
+                labelIncrement: "Salary Increment (%)",
+                labelDividend: "EPF Dividend (%)",
+                titleSpending: "Retirement Spending",
+                labelDesiredIncome: "Desired Monthly Expenses (Today's RM)",
+                helpDesired: "Monthly budget in today's money",
+                labelInflation: "Inflation Rate (%)",
+                labelPostReturn: "Post-Retire Return (%)",
+                btnCalculate: "Calculate Future",
+                titleProjection: "Your Projection",
+                resFundAt: "Fund at Age",
+                resFundDesc: "Projected total EPF balance.",
+                resLastTitle: "Money Will Last For",
+                unitYears: "Years",
+                resUntilAge: "Until age",
+                realityTitle: "Cost of Living Impact",
+                footerNote: "Based on statutory contribution rates (subject to RM 5,000 salary threshold logic).",
+                chartAcc: "EPF Fund (RM)",
+                chartDraw: "Drawdown (RM)",
+                chartSalary: "Annual Income (RM)",
+                showSalary: "Show Income Line",
+                chartTitle: "Financial Forecast",
+                chartX: "Age",
+                chartYFund: "EPF Fund Balance",
+                chartYSalary: "Annual Income",
+                tableTitle: "Yearly Detailed Breakdown",
+                colAge: "Age",
+                colPhase: "Phase",
+                colIncome: "Annual Income (RM)",
+                colSavings: "EPF Balance (RM)",
+                colWithdrawal: "Monthly Exp (RM)",
+                phaseAccum: "Accumulating",
+                phaseRetired: "Retired",
+                errorAge: "Retirement age must be greater than current age.",
+                hintHigh: "Salary > RM 5k: 12%",
+                hintLow: "Salary ≤ RM 5k: 13%",
+                realityPart1: "Due to ",
+                realityPart2: "% inflation, your desired RM ",
+                realityPart3: "/month today will cost ",
+                realityPart4: "/month when you retire.",
+                warnSolid: "🌟 Your retirement plan looks solid and sustainable.",
+                warnModerate: "⚠️ Your fund covers a moderate period. Consider saving more for longevity.",
+                warnRisk: "🚨 Risk: Your fund may run out early. Increase savings or lower expenses."
+            },
+            zh: {
+                titleDetails: "个人详情",
+                labelCurrentEpf: "当前公积金存款 (RM)",
+                labelCurrentAge: "当前年龄",
+                labelRetireAge: "退休年龄",
+                titleSalary: "薪水与缴纳额",
+                labelMonthlySalary: "每月基本薪水 (RM)",
+                labelAnnualSalary: "年度:",
+                labelEmployeeRate: "员工缴纳率 (%)",
+                labelEmployerRate: "雇主缴纳率 (%)",
+                labelBonus: "年度奖金 (RM)",
+                helpBonus: "需缴纳公积金的预估奖金",
+                labelIncrement: "年度加薪幅度 (%)",
+                labelDividend: "公积金派息率 (%)",
+                titleSpending: "退休开销",
+                labelDesiredIncome: "理想月消费 (以今日购买力计)",
+                helpDesired: "以今天的物价预估退休后的月开销",
+                labelInflation: "通货膨胀率 (%)",
+                labelPostReturn: "退休后投资回报 (%)",
+                btnCalculate: "开始计算",
+                titleProjection: "未来预测",
+                resFundAt: "退休总额 @ 年龄",
+                resFundDesc: "预计公积金账户总额",
+                resLastTitle: "资金可持续性",
+                unitYears: "年",
+                resUntilAge: "直到年龄",
+                realityTitle: "生活成本影响",
+                footerNote: "基于法定缴纳率计算（包含 RM 5,000 薪水门槛逻辑）。",
+                chartAcc: "公积金总额 (RM)",
+                chartDraw: "提款阶段 (RM)",
+                chartSalary: "年度总收入 (RM)",
+                showSalary: "显示收入曲线",
+                chartTitle: "财务趋势图",
+                chartX: "年龄",
+                chartYFund: "公积金余额",
+                chartYSalary: "年度总收入",
+                tableTitle: "年度详细数据表",
+                colAge: "年龄",
+                colPhase: "阶段",
+                colIncome: "年度收入 (RM)",
+                colSavings: "公积金余额 (RM)",
+                colWithdrawal: "月度开销 (RM)",
+                phaseAccum: "储蓄期",
+                phaseRetired: "退休期",
+                errorAge: "退休年龄必须大于当前年龄。",
+                hintHigh: "薪水 > RM 5k: 12%",
+                hintLow: "薪水 ≤ RM 5k: 13%",
+                realityPart1: "由于 ",
+                realityPart2: "% 的通胀，您今天向往的每月 RM ",
+                realityPart3: " 生活水平，在退休时将需要每月 ",
+                realityPart4: " 才能维持。",
+                warnSolid: "🌟 您的退休计划非常稳健，资金充足。",
+                warnModerate: "⚠️ 您的资金可支撑一段中等时间，建议增加储蓄以防长寿风险。",
+                warnRisk: "🚨 风险：您的资金可能会过早耗尽。建议增加存款或降低开支。"
+            }
+        };
+
+        function setLanguage(lang) {
+            currentLang = lang;
+            document.getElementById('btn-en').className = lang === 'en' ? 'px-4 py-1 rounded-full text-sm font-bold bg-blue-600 text-white shadow-sm border border-blue-600 transition' : 'px-4 py-1 rounded-full text-sm font-bold bg-white text-gray-600 border border-gray-300 hover:border-blue-600 transition';
+            document.getElementById('btn-zh').className = lang === 'zh' ? 'px-4 py-1 rounded-full text-sm font-bold bg-blue-600 text-white shadow-sm border border-blue-600 transition' : 'px-4 py-1 rounded-full text-sm font-bold bg-white text-gray-600 border border-gray-300 hover:border-blue-600 transition';
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                if (i18n[lang][key]) el.innerText = i18n[lang][key];
+            });
+            updateDefaultRates();
+            calculateEPF();
+        }
+
+        function updateDefaultRates() {
+            const salary = parseFloat(document.getElementById('salary').value) || 0;
+            const employerInput = document.getElementById('employerRate');
+            const hint = document.getElementById('rateHint');
+            const annualDisplay = document.getElementById('annualSalaryDisplay');
+            annualDisplay.innerText = Math.round(salary * 12).toLocaleString();
+            if (salary > 5000) {
+                employerInput.value = 12;
+                hint.innerText = i18n[currentLang].hintHigh;
+            } else {
+                employerInput.value = 13;
+                hint.innerText = i18n[currentLang].hintLow;
+            }
+        }
+
+        function calculateEPF() {
+            const errorEl = document.getElementById('errorMessage');
+            errorEl.classList.add('hidden');
+            
+            let balance = parseFloat(document.getElementById('currentEpf').value) || 0;
+            let currentAge = parseInt(document.getElementById('currentAge').value) || 0;
+            let retireAge = parseInt(document.getElementById('retireAge').value) || 0;
+            let salary = parseFloat(document.getElementById('salary').value) || 0;
+            let employeeRate = (parseFloat(document.getElementById('employeeRate').value) || 0) / 100;
+            let employerRate = (parseFloat(document.getElementById('employerRate').value) || 0) / 100;
+            let bonus = parseFloat(document.getElementById('bonus').value) || 0;
+            let increment = parseFloat(document.getElementById('increment').value) / 100 || 0;
+            let epfReturn = parseFloat(document.getElementById('epfReturn').value) / 100 || 0;
+            let desiredIncome = parseFloat(document.getElementById('desiredIncome').value) || 0;
+            let inflation = parseFloat(document.getElementById('inflation').value) / 100 || 0;
+            let postRetireReturn = parseFloat(document.getElementById('postRetireReturn').value) / 100 || 0;
+            let showSalaryLine = document.getElementById('toggleSalary').checked;
+
+            let yearsToRetire = retireAge - currentAge;
+            if (yearsToRetire <= 0) {
+                errorEl.innerText = i18n[currentLang].errorAge;
+                errorEl.classList.remove('hidden');
+                return;
+            }
+
+            let chartLabels = [];
+            let chartAccData = [];
+            let chartDrawData = [];
+            let chartSalaryData = [];
+            let tableRows = [];
+
+            // Initial State
+            chartLabels.push(currentAge);
+            chartAccData.push(balance);
+            chartDrawData.push(null);
+            chartSalaryData.push(salary * 12 + bonus);
+            tableRows.push({ age: currentAge, phase: i18n[currentLang].phaseAccum, income: salary * 12 + bonus, balance: balance, withdrawal: 0 });
+
+            // Accumulation
+            let yearlySalary = salary * 12;
+            let yearlyBonus = bonus;
+            for (let i = 1; i <= yearsToRetire; i++) {
+                let currentTotalIncome = yearlySalary + yearlyBonus;
+                let yearlyContribution = currentTotalIncome * (employeeRate + employerRate);
+                balance += yearlyContribution;
+                balance *= (1 + epfReturn);
+                
+                yearlySalary *= (1 + increment);
+                yearlyBonus *= (1 + increment);
+
+                chartLabels.push(currentAge + i);
+                chartAccData.push(balance);
+                chartDrawData.push(null);
+                chartSalaryData.push(yearlySalary + yearlyBonus);
+                tableRows.push({ age: currentAge + i, phase: i18n[currentLang].phaseAccum, income: yearlySalary + yearlyBonus, balance: balance, withdrawal: 0 });
+            }
+
+            let retirementFund = balance;
+
+            // Decumulation
+            let futureMonthlyExpenses = desiredIncome * Math.pow(1 + inflation, yearsToRetire);
+            let annualWithdrawal = futureMonthlyExpenses * 12;
+            let postRetirementBalance = retirementFund;
+            let yearsLasted = 0;
+            let maxYears = 50; 
+            
+            chartDrawData[chartLabels.length - 1] = retirementFund;
+
+            while (postRetirementBalance > 0 && yearsLasted < maxYears) {
+                postRetirementBalance -= annualWithdrawal;
+                if (postRetirementBalance < 0) {
+                    let prev = postRetirementBalance + annualWithdrawal;
+                    yearsLasted += (prev / annualWithdrawal);
+                    postRetirementBalance = 0;
+                } else {
+                    postRetirementBalance *= (1 + postRetireReturn);
+                    yearsLasted++;
+                }
+                
+                let age = retireAge + Math.ceil(yearsLasted);
+                chartLabels.push(age);
+                chartAccData.push(null);
+                chartDrawData.push(postRetirementBalance);
+                chartSalaryData.push(null);
+                tableRows.push({ age: age, phase: i18n[currentLang].phaseRetired, income: 0, balance: postRetirementBalance, withdrawal: annualWithdrawal / 12 });
+                
+                if (postRetirementBalance <= 0) break;
+                annualWithdrawal *= (1 + inflation);
+            }
+
+            // Update UI Summary
+            document.getElementById('resAge').innerText = retireAge;
+            document.getElementById('resTotal').innerText = Math.round(retirementFund).toLocaleString();
+            let displayYears = yearsLasted >= maxYears ? "50+" : yearsLasted.toFixed(1);
+            document.getElementById('resYears').innerText = displayYears;
+            document.getElementById('resFinalAge').innerText = yearsLasted >= maxYears ? "110+" : Math.floor(retireAge + yearsLasted);
+
+            const t = i18n[currentLang];
+            document.getElementById('realityText').innerHTML = 
+                `${t.realityPart1}<strong>${(inflation * 100).toFixed(1)}</strong>${t.realityPart2}<strong>${desiredIncome.toLocaleString()}</strong>${t.realityPart3}` + 
+                `<strong class="text-gray-900">RM ${Math.round(futureMonthlyExpenses).toLocaleString()}</strong>${t.realityPart4}`;
+
+            let warningEl = document.getElementById('sustainabilityWarning');
+            if (yearsLasted >= 25) { warningEl.innerText = t.warnSolid; warningEl.className = "text-sm font-bold text-emerald-600"; }
+            else if (yearsLasted >= 15) { warningEl.innerText = t.warnModerate; warningEl.className = "text-sm font-bold text-amber-500"; }
+            else { warningEl.innerText = t.warnRisk; warningEl.className = "text-sm font-bold text-red-600"; }
+
+            // Update Table
+            renderTable(tableRows);
+
+            // Update Chart
+            renderChart(chartLabels, chartAccData, chartDrawData, chartSalaryData, showSalaryLine);
+        }
+
+        function renderTable(rows) {
+            const body = document.getElementById('breakdownBody');
+            body.innerHTML = rows.map(row => `
+                <tr class="hover:bg-gray-50 transition-colors">
+                    <td class="px-4 py-3 font-semibold text-gray-700">${row.age}</td>
+                    <td class="px-4 py-3">
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${row.phase.includes('Accum') || row.phase.includes('储') ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'}">
+                            ${row.phase}
+                        </span>
+                    </td>
+                    <td class="px-4 py-3 text-right text-gray-600">${row.income > 0 ? 'RM ' + Math.round(row.income).toLocaleString() : '-'}</td>
+                    <td class="px-4 py-3 text-right font-mono font-medium text-gray-900">RM ${Math.round(row.balance).toLocaleString()}</td>
+                    <td class="px-4 py-3 text-right text-red-600 font-medium">${row.withdrawal > 0 ? 'RM ' + Math.round(row.withdrawal).toLocaleString() : '-'}</td>
+                </tr>
+            `).join('');
+        }
+
+        function renderChart(labels, accData, decData, salaryData, showSalary) {
+            const ctx = document.getElementById('epfChart').getContext('2d');
+            if (chartInstance) chartInstance.destroy();
+
+            const t = i18n[currentLang];
+            const datasets = [
+                {
+                    label: t.chartAcc,
+                    data: accData,
+                    borderColor: '#3b82f6',
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    fill: true, tension: 0.3, pointRadius: 2, yAxisID: 'y'
+                },
+                {
+                    label: t.chartDraw,
+                    data: decData,
+                    borderColor: '#10b981',
+                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                    fill: true, tension: 0.3, pointRadius: 2, yAxisID: 'y'
+                }
+            ];
+
+            if (showSalary) {
+                datasets.push({
+                    label: t.chartSalary,
+                    data: salaryData,
+                    borderColor: '#8b5cf6',
+                    borderDash: [5, 5],
+                    borderWidth: 2,
+                    fill: false, tension: 0.3, pointRadius: 2, yAxisID: 'y1'
+                });
+            }
+
+            chartInstance = new Chart(ctx, {
+                type: 'line',
+                data: { labels: labels, datasets: datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { title: { display: true, text: t.chartX } },
+                        y: { 
+                            title: { display: true, text: t.chartYFund },
+                            position: 'left',
+                            ticks: { callback: v => 'RM ' + (v/1000).toFixed(0) + 'k' } 
+                        },
+                        y1: {
+                            display: showSalary,
+                            title: { display: true, text: t.chartYSalary },
+                            position: 'right',
+                            grid: { drawOnChartArea: false },
+                            ticks: { callback: v => 'RM ' + (v/1000).toFixed(0) + 'k' }
+                        }
+                    },
+                    plugins: {
+                        legend: { position: 'bottom' },
+                        tooltip: {
+                            callbacks: {
+                                label: (c) => `RM ${Math.round(c.parsed.y).toLocaleString()}`
+                            }
+                        },
+                        // Labeling points every 5 years
+                        datalabels: {
+                            align: 'top',
+                            offset: 5,
+                            font: { size: 9, weight: 'bold' },
+                            color: (context) => context.dataset.borderColor,
+                            formatter: (value, context) => {
+                                const age = labels[context.dataIndex];
+                                // Show labels for age divisible by 5 or key milestones
+                                if (value && (age % 5 === 0)) {
+                                    if (value >= 1000000) return (value / 1000000).toFixed(2) + 'M';
+                                    return (value / 1000).toFixed(0) + 'k';
+                                }
+                                return null;
+                            },
+                            display: 'auto'
+                        }
+                    }
+                }
+            });
+        }
+
+        window.onload = () => setLanguage('en');
+    </script>
+</body>
+</html>
